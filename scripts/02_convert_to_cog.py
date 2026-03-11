@@ -19,9 +19,12 @@ for file in OUTPUT_DIR.glob("*.tif"):
 if not INPUT_DIR.exists():
     raise FileNotFoundError(f"Input directory {INPUT_DIR} does not exist")
 
-for file in INPUT_DIR.iterdir():
+# Sort files so forecast hours stay in order
+for file in sorted(INPUT_DIR.iterdir()):
     if file.is_file():
-        output_file = OUTPUT_DIR / f"{file.stem}.tif"
+
+        # FIX: use full filename to preserve forecast hour
+        output_file = OUTPUT_DIR / f"{file.name}.tif"
 
         cmd = [
             "gdal_translate",
@@ -32,5 +35,7 @@ for file in INPUT_DIR.iterdir():
         ]
 
         subprocess.run(cmd, check=True)
+
+        print(f"Converted {file.name} → {output_file.name}")
 
 print("All GRIB files converted to COG successfully")
