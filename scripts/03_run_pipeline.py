@@ -15,7 +15,7 @@ logging.basicConfig(
 BASE_DIR = Path(__file__).resolve().parent
 SCRIPTS_DIR = BASE_DIR
 
-DOWNLOAD_SCRIPT = SCRIPTS_DIR / "01_download_gfs.py"
+DOWNLOAD_SCRIPT = SCRIPTS_DIR / "01_download_data.py"
 COG_SCRIPT = SCRIPTS_DIR / "02_convert_to_cog.py"
 
 # ---------------- FUNCTION TO RUN SCRIPT ----------------
