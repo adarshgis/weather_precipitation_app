@@ -1,22 +1,23 @@
 import subprocess
 from pathlib import Path
 
-# Project root
-BASE_DIR = Path(__file__).resolve().parents[2]
+# ---------------- PROJECT ROOT ----------------
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Input and output folders
+# ---------------- INPUT & OUTPUT PATHS ----------------
 INPUT_DIR = BASE_DIR / "data" / "raw_grib"
-OUTPUT_DIR = BASE_DIR / "data" / "processed_cog"
+OUTPUT_DIR = BASE_DIR / "data" / "cog"
 
+# Create output folder if it doesn't exist
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Convert GRIB → COG
+# ---------------- COG CONVERSION ----------------
+if not INPUT_DIR.exists():
+    raise FileNotFoundError(f"Input directory {INPUT_DIR} does not exist")
+
 for file in INPUT_DIR.iterdir():
-
     if file.is_file():
-
-        output_file = OUTPUT_DIR / f"{file.name}.tif"
-
+        output_file = OUTPUT_DIR / f"{file.stem}.tif"
         cmd = [
             "gdal_translate",
             str(file),
@@ -24,7 +25,6 @@ for file in INPUT_DIR.iterdir():
             "-of", "COG",
             "-co", "COMPRESS=LZW"
         ]
-
         subprocess.run(cmd, check=True)
 
-print("COG conversion complete")
+print("All GRIB files converted to COG successfully")
