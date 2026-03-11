@@ -10,7 +10,11 @@ from urllib3.util.retry import Retry
 
 BASE_URL = "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl"
 
-OUTPUT_DIR = Path("downloaded_data")
+# Define project root relative to scripts folder
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Standard folder for raw GRIB files
+OUTPUT_DIR = BASE_DIR / "data" / "raw_grib"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 FORECAST_HOURS = list(range(5,121,5))
