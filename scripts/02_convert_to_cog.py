@@ -11,6 +11,10 @@ OUTPUT_DIR = BASE_DIR / "data" / "cog"
 # Create output folder if it doesn't exist
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# ---------------- CLEAN OLD COG FILES ----------------
+for file in OUTPUT_DIR.glob("*.tif"):
+    file.unlink()
+
 # ---------------- COG CONVERSION ----------------
 if not INPUT_DIR.exists():
     raise FileNotFoundError(f"Input directory {INPUT_DIR} does not exist")
@@ -18,6 +22,7 @@ if not INPUT_DIR.exists():
 for file in INPUT_DIR.iterdir():
     if file.is_file():
         output_file = OUTPUT_DIR / f"{file.stem}.tif"
+
         cmd = [
             "gdal_translate",
             str(file),
@@ -25,6 +30,7 @@ for file in INPUT_DIR.iterdir():
             "-of", "COG",
             "-co", "COMPRESS=LZW"
         ]
+
         subprocess.run(cmd, check=True)
 
 print("All GRIB files converted to COG successfully")
