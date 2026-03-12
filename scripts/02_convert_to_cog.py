@@ -23,9 +23,9 @@ for file in sorted(INPUT_DIR.iterdir()):
 
     if file.is_file():
 
-        # preserve forecast hour
         tif_file = OUTPUT_DIR / f"{file.name}.tif"
         clean_tif = OUTPUT_DIR / f"{file.name}_clean.tif"
+        byte_tif = OUTPUT_DIR / f"{file.name}_byte.tif"
 
         print(f"Processing {file.name}")
 
@@ -45,9 +45,20 @@ for file in sorted(INPUT_DIR.iterdir()):
             "--NoDataValue", "0"
         ], check=True)
 
-        # remove intermediate tif
-        tif_file.unlink()
+        # Convert to 8-bit for gdal2tiles
+        subprocess.run([
+            "gdal_translate",
+            "-ot", "Byte",
+            "-scale", "0", "100", "0", "255",
+            "-a_nodata", "0",
+            str(clean_tif),
+            str(byte_tif)
+        ], check=True)
 
-        print(f"Created {clean_tif.name}")
+        # remove intermediate files
+        tif_file.unlink()
+        clean_tif.unlink()
+
+        print(f"Created {byte_tif.name}")
 
 print("All GRIB files converted successfully")
