@@ -20,9 +20,9 @@ if not INPUT_DIR.exists():
     raise FileNotFoundError(f"{INPUT_DIR} does not exist")
 
 # ---------------- TILE GENERATION ----------------
-for tif_file in sorted(INPUT_DIR.glob("*_byte.tif")):
+for tif_file in sorted(INPUT_DIR.glob("*_3857.tif")):
 
-    forecast_name = tif_file.stem.replace("_byte", "")
+    forecast_name = tif_file.stem.replace("_3857", "")
     tile_folder = OUTPUT_DIR / forecast_name
 
     print(f"Generating tiles for {tif_file.name}")
