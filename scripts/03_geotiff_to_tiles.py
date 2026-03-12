@@ -9,8 +9,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 INPUT_DIR = BASE_DIR / "data" / "geotiff"
 OUTPUT_DIR = BASE_DIR / "tiles"
 
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
 # ---------------- CLEAN OLD TILES ----------------
 if OUTPUT_DIR.exists():
     shutil.rmtree(OUTPUT_DIR)
@@ -22,18 +20,18 @@ if not INPUT_DIR.exists():
     raise FileNotFoundError(f"{INPUT_DIR} does not exist")
 
 # ---------------- TILE GENERATION ----------------
-for tif_file in sorted(INPUT_DIR.glob("*_clean.tif")):
+for tif_file in sorted(INPUT_DIR.glob("*_byte.tif")):
 
-    forecast_name = tif_file.stem.replace("_clean", "")
+    forecast_name = tif_file.stem.replace("_byte", "")
     tile_folder = OUTPUT_DIR / forecast_name
 
     print(f"Generating tiles for {tif_file.name}")
 
     cmd = [
         "gdal2tiles.py",
-        "-z", "2-6",          # zoom levels
-        "-w", "none",         # no leaflet viewer
-        "--processes", "4",   # faster tile generation
+        "-z", "2-6",
+        "-w", "none",
+        "--processes", "4",
         str(tif_file),
         str(tile_folder)
     ]
