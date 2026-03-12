@@ -6,36 +6,48 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ---------------- INPUT & OUTPUT PATHS ----------------
 INPUT_DIR = BASE_DIR / "data" / "raw_grib"
-OUTPUT_DIR = BASE_DIR / "data" / "cog"
+OUTPUT_DIR = BASE_DIR / "data" / "geotiff"
 
-# Create output folder if it doesn't exist
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# ---------------- CLEAN OLD COG FILES ----------------
+# ---------------- CLEAN OLD FILES ----------------
 for file in OUTPUT_DIR.glob("*.tif"):
     file.unlink()
 
-# ---------------- COG CONVERSION ----------------
+# ---------------- CHECK INPUT ----------------
 if not INPUT_DIR.exists():
     raise FileNotFoundError(f"Input directory {INPUT_DIR} does not exist")
 
-# Sort files so forecast hours stay in order
+# ---------------- CONVERSION ----------------
 for file in sorted(INPUT_DIR.iterdir()):
+
     if file.is_file():
 
-        # FIX: use full filename to preserve forecast hour
-        output_file = OUTPUT_DIR / f"{file.name}.tif"
+        # preserve forecast hour
+        tif_file = OUTPUT_DIR / f"{file.name}.tif"
+        clean_tif = OUTPUT_DIR / f"{file.name}_clean.tif"
 
-        cmd = [
+        print(f"Processing {file.name}")
+
+        # GRIB → GeoTIFF
+        subprocess.run([
             "gdal_translate",
             str(file),
-            str(output_file),
-            "-of", "COG",
-            "-co", "COMPRESS=LZW"
-        ]
+            str(tif_file)
+        ], check=True)
 
-        subprocess.run(cmd, check=True)
+        # Remove zero pixels (make transparent)
+        subprocess.run([
+            "gdal_calc.py",
+            "-A", str(tif_file),
+            "--outfile", str(clean_tif),
+            "--calc", "A*(A>0)",
+            "--NoDataValue", "0"
+        ], check=True)
 
-        print(f"Converted {file.name} → {output_file.name}")
+        # remove intermediate tif
+        tif_file.unlink()
 
-print("All GRIB files converted to COG successfully")
+        print(f"Created {clean_tif.name}")
+
+print("All GRIB files converted successfully")
