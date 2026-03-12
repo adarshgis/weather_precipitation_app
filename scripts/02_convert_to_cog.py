@@ -26,6 +26,7 @@ for file in sorted(INPUT_DIR.iterdir()):
         tif_file = OUTPUT_DIR / f"{file.name}.tif"
         clean_tif = OUTPUT_DIR / f"{file.name}_clean.tif"
         byte_tif = OUTPUT_DIR / f"{file.name}_byte.tif"
+        mercator_tif = OUTPUT_DIR / f"{file.name}_3857.tif"
 
         print(f"Processing {file.name}")
 
@@ -55,10 +56,20 @@ for file in sorted(INPUT_DIR.iterdir()):
             str(byte_tif)
         ], check=True)
 
+        # Reproject to Web Mercator (required for XYZ tiles)
+        subprocess.run([
+            "gdalwarp",
+            "-t_srs", "EPSG:3857",
+            "-r", "bilinear",
+            str(byte_tif),
+            str(mercator_tif)
+        ], check=True)
+
         # remove intermediate files
         tif_file.unlink()
         clean_tif.unlink()
+        byte_tif.unlink()
 
-        print(f"Created {byte_tif.name}")
+        print(f"Created {mercator_tif.name}")
 
 print("All GRIB files converted successfully")
