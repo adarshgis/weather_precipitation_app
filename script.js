@@ -42,7 +42,8 @@ const forecastLayers = timesteps.map(folder =>
         minZoom: 2,
         maxZoom: 6,
         opacity: 0.7,
-        attribution: "GFS Precipitation Forecast"
+        attribution: "GFS Precipitation Forecast",
+        errorTileUrl: "https://adarshgis.github.io/weather_precipitation_app/tiles/placeholder.png" // optional fallback if tile missing
     })
 );
 
