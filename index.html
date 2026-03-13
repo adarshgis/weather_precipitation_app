@@ -14,7 +14,7 @@
     />
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://adarshgis.github.io/weather_precipitation_app/style.css">
 </head>
 <body>
 
@@ -37,6 +37,25 @@
 </script>
 
 <!-- Custom Script -->
-<script src="script.js"></script>
+<script src="https://adarshgis.github.io/weather_precipitation_app/script.js"></script>
+
+<script>
+// ---------------------------
+// Extra precaution: initialize slider label correctly
+document.addEventListener("DOMContentLoaded", function(){
+    const slider = document.getElementById("forecast-slider");
+    const forecastHourLabel = document.getElementById("forecast-hour");
+
+    // Update label based on slider value
+    slider.addEventListener("input", function(){
+        const hour = 5 + parseInt(this.value)*5; // f005, f010...
+        forecastHourLabel.innerText = "Hour " + hour;
+    });
+
+    // Set initial label
+    forecastHourLabel.innerText = "Hour 5";
+});
+</script>
+
 </body>
 </html>
