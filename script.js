@@ -1,21 +1,45 @@
-<script>
-    // 1️⃣ Initialize the map
-    const map = L.map('map').setView([23.0, 80.0], 4); // Center on India (lat, lon), zoom level 4
+// 1️⃣ Initialize the map (centered on India)
+const map = L.map('map').setView([23.0, 80.0], 4);
 
-    // 2️⃣ Add OpenStreetMap base layer (optional, can be removed later)
-    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19
-    }).addTo(map);
+// 2️⃣ Optional base layer (OpenStreetMap)
+const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19
+}).addTo(map);
 
-    // 3️⃣ Add first forecast tile layer (f005)
-    const forecastLayer = L.tileLayer(
-        'https://adarshgis.github.io/weather_precipitation_app/tiles/gfs.t00z.pgrb2.0p25.f005/{z}/{x}/{y}.png',
+// 3️⃣ Forecast timesteps (update this array if you have more folders)
+const timesteps = [
+    "gfs.t00z.pgrb2.0p25.f005",
+    "gfs.t00z.pgrb2.0p25.f010",
+    "gfs.t00z.pgrb2.0p25.f015"
+];
+
+// 4️⃣ Current tile layer
+let currentLayer;
+
+// Function to display a specific timestep
+function showTimestep(index) {
+    if (currentLayer) map.removeLayer(currentLayer);
+
+    const folder = timesteps[index];
+    currentLayer = L.tileLayer(
+        `https://adarshgis.github.io/weather_precipitation_app/tiles/${folder}/{z}/{x}/{y}.png`,
         {
             minZoom: 2,
             maxZoom: 6,
-            attribution: 'GFS Precipitation Forecast'
+            attribution: "GFS Precipitation Forecast"
         }
     ).addTo(map);
 
-</script>
+    // Update label
+    document.getElementById("timestepLabel").innerText = folder.split('.').pop();
+}
+
+// 5️⃣ Initialize first timestep
+showTimestep(0);
+
+// 6️⃣ Listen to slider changes
+document.getElementById("timeSlider").addEventListener("input", function(e) {
+    const index = parseInt(e.target.value);
+    showTimestep(index);
+});
