@@ -5,7 +5,7 @@
 
 /* ── CONFIG ──────────────────────────────────── */
 const CFG = {
-    geojsonPath: 'precipitation_timeseries.geojson',
+    geojsonPath: 'geojson/precipitation_timeseries.geojson',
     mapCenter:   [20, 78],
     mapZoom:     4,
     defaultInterval: 1200,
