@@ -2,10 +2,11 @@
 
 /* ═══════════════════════════════════════════════
    PRECIPRADAR · PRODUCTION BUILD
+   ═══════════════════════════════════════════════ */
 
 /* ── CONFIG ──────────────────────────────────── */
 const CFG = {
-    geojsonPath: 'geojson/precipitation_timeseries.geojson',
+    geojsonPath: 'precipitation_timeseries.geojson',
     mapCenter:   [20, 78],
     mapZoom:     4,
     defaultInterval: 1200,
@@ -38,22 +39,92 @@ const state = {
 /* ── DOM ─────────────────────────────────────── */
 const $ = id => document.getElementById(id);
 const dom = {
-    btnPlay:      $('btnPlayPause'),
-    btnPrev:      $('btnPrev'),
-    btnNext:      $('btnNext'),
-    btnLoop:      $('btnLoop'),
-    slider:       $('timeSlider'),
-    opacitySlider:$('opacitySlider'),
-    tsUTC:        $('tsUTC'),
-    tsIST:        $('tsIST'),
-    tsFhour:      $('tsFhour'),
-    loadOverlay:  $('loadOverlay'),
-    loadText:     $('loadText'),
-    dataStatus:   $('dataStatus'),
-    statFeatures: $('statFeatures'),
-    statStep:     $('statStep'),
-    statSteps:    $('statSteps')
+    btnPlay:       $('btnPlayPause'),
+    btnPrev:       $('btnPrev'),
+    btnNext:       $('btnNext'),
+    btnLoop:       $('btnLoop'),
+    slider:        $('timeSlider'),
+    opacitySlider: $('opacitySlider'),
+    tsUTCTime:     $('tsUTCTime'),
+    tsUTCDate:     $('tsUTCDate'),
+    tsISTTime:     $('tsISTTime'),
+    tsISTDate:     $('tsISTDate'),
+    tsFhour:       $('tsFhour'),
+    loadOverlay:   $('loadOverlay'),
+    loadText:      $('loadText'),
+    dataStatus:    $('dataStatus')
 };
+
+/* ── TIMESTAMP FORMATTER ─────────────────────── */
+/**
+ * Parses a timestamp string (e.g. "2024-06-01 12:00 UTC" or ISO)
+ * and returns { time: "HH:MM", date: "DD/MM/YYYY" } for UTC and IST.
+ */
+function parseTimestamps(utcStr, istStr) {
+    function fmt(str) {
+        if (!str || str === '—') return { time: '—', date: '—' };
+
+        // Try to extract date/time parts from common GFS formats
+        // e.g. "2024-06-01 12:00" or "2024-06-01T12:00:00Z"
+        let d = new Date(str.replace(' ', 'T').replace(/(?<!\+\d{2})$/, 'Z').replace('Z Z', 'Z'));
+
+        if (isNaN(d.getTime())) {
+            // Fallback: just display the raw string split on space
+            const parts = str.trim().split(/[\s T]+/);
+            const datePart = parts[0] || '';
+            const timePart = parts[1] ? parts[1].slice(0, 5) : '—';
+            // datePart might be YYYY-MM-DD, convert to DD/MM/YYYY
+            const dp = datePart.split('-');
+            const dateFormatted = dp.length === 3
+                ? `${dp[2]}/${dp[1]}/${dp[0]}`
+                : datePart;
+            return { time: timePart, date: dateFormatted };
+        }
+
+        const hh = String(d.getUTCHours()).padStart(2, '0');
+        const mm = String(d.getUTCMinutes()).padStart(2, '0');
+        const dd = String(d.getUTCDate()).padStart(2, '0');
+        const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const yy = d.getUTCFullYear();
+        return { time: `${hh}:${mm}`, date: `${dd}/${mo}/${yy}` };
+    }
+
+    // For IST string: if it contains offset or "IST", parse accordingly
+    function fmtIST(str) {
+        if (!str || str === '—') return { time: '—', date: '—' };
+
+        // Try direct parse first (IST strings may include +05:30)
+        let d = new Date(str.replace(' ', 'T').replace('IST', '+05:30').replace(/\s+\+/, '+'));
+
+        if (isNaN(d.getTime())) {
+            // Fallback raw split
+            const parts = str.trim().split(/[\s T]+/);
+            const datePart = parts[0] || '';
+            const timePart = parts[1] ? parts[1].slice(0, 5) : '—';
+            const dp = datePart.split('-');
+            const dateFormatted = dp.length === 3
+                ? `${dp[2]}/${dp[1]}/${dp[0]}`
+                : datePart;
+            return { time: timePart, date: dateFormatted };
+        }
+
+        // Use local time parts if offset was parsed, else UTC+5:30 manually
+        // Safest: convert UTC to IST by adding 330 minutes
+        const istMs = d.getTime() + (330 * 60 * 1000);
+        const ist = new Date(istMs);
+        const hh = String(ist.getUTCHours()).padStart(2, '0');
+        const mm = String(ist.getUTCMinutes()).padStart(2, '0');
+        const dd = String(ist.getUTCDate()).padStart(2, '0');
+        const mo = String(ist.getUTCMonth() + 1).padStart(2, '0');
+        const yy = ist.getUTCFullYear();
+        return { time: `${hh}:${mm}`, date: `${dd}/${mo}/${yy}` };
+    }
+
+    return {
+        utc: fmt(utcStr),
+        ist: fmtIST(istStr || utcStr) // if no IST string, derive from UTC
+    };
+}
 
 /* ── MAP ─────────────────────────────────────── */
 const map = L.map('map', {
@@ -66,9 +137,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
 
-/* ── CANVAS — attached to mapPane to avoid double-offset ── */
-// mapPane has NO CSS transform applied by Leaflet, so canvas
-// pixels stay aligned with latLngToContainerPoint projections.
+/* ── CANVAS ─────────────────────────────────── */
 const mapPane = map.getPane('mapPane');
 const canvas  = document.createElement('canvas');
 canvas.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:450;';
@@ -88,13 +157,9 @@ resizeCanvas();
 
 /* ── PROJECTION ─────────────────────────────── */
 function project([lng, lat]) {
-    const p = map.latLngToContainerPoint([lat, lng]);
-    return p;
+    return map.latLngToContainerPoint([lat, lng]);
 }
 
-/* ── CLEAR PROJECTION CACHE ─────────────────── */
-// Must be called whenever the map moves/zooms so stored pixel
-// coordinates (which are viewport-relative) are recalculated.
 function clearProjectionCache() {
     for (const f of state.allFeatures) {
         delete f.geometry._projected;
@@ -122,7 +187,6 @@ function drawRings(rings) {
     }
 }
 
-// Cache rgba strings to avoid repeated string building
 const _rgbaCache = Object.create(null);
 function hexToRgba(hex, alpha) {
     const key = hex + '|' + alpha;
@@ -134,15 +198,12 @@ function hexToRgba(hex, alpha) {
 }
 
 /* ── DRAW FRAME ─────────────────────────────── */
-// FIX: one beginPath/fill/stroke cycle PER COLOR GROUP
-// so each intensity renders with its own colour correctly.
 function drawFrame() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (!state.dataLoaded) return;
 
     const features = state.index.get(state.timesteps[state.stepIndex]) || [];
 
-    // 1. Ensure projections are computed (or taken from cache)
     for (const f of features) {
         const g = f.geometry;
         if (!g._projected) {
@@ -154,7 +215,6 @@ function drawFrame() {
         }
     }
 
-    // 2. Group by intensity key for batched same-colour drawing
     const groups = Object.create(null);
     for (const f of features) {
         const key = f.properties.intensity;
@@ -162,15 +222,12 @@ function drawFrame() {
         groups[key].push(f);
     }
 
-    // 3. Draw each colour group in one path
     for (const [intensity, group] of Object.entries(groups)) {
         const color = CFG.rainColors[intensity] || '#29b6f6';
         ctx.fillStyle   = hexToRgba(color, state.opacity);
         ctx.strokeStyle = hexToRgba(color, Math.min(state.opacity + 0.15, 1));
         ctx.lineWidth   = 0.4;
-
         ctx.beginPath();
-
         for (const f of group) {
             const g = f.geometry;
             if (!g._projected) continue;
@@ -180,21 +237,30 @@ function drawFrame() {
                 g._projected.forEach(poly => drawRings(poly));
             }
         }
-
         ctx.fill('evenodd');
         ctx.stroke();
     }
 
-    // 4. Update UI
+    // Update timestamp UI
     const first = features[0];
-    if (dom.tsUTC)        dom.tsUTC.textContent    = first?.properties.timestamp_utc  || '—';
-    if (dom.tsIST)        dom.tsIST.textContent    = first?.properties.timestamp_ist  || '—';
-    if (dom.tsFhour)      dom.tsFhour.textContent  = `F+${first?.properties.forecast_hour ?? '—'}h`;
-    if (dom.statFeatures) dom.statFeatures.textContent = features.length;
-    if (dom.statStep)     dom.statStep.textContent     = state.stepIndex + 1;
-    if (dom.statSteps)    dom.statSteps.textContent    = state.timesteps.length;
+    if (first) {
+        const utcRaw = first.properties.timestamp_utc || '';
+        const istRaw = first.properties.timestamp_ist || '';
+        const { utc, ist } = parseTimestamps(utcRaw, istRaw);
 
-    // Sync slider thumb
+        if (dom.tsUTCTime) dom.tsUTCTime.textContent = utc.time;
+        if (dom.tsUTCDate) dom.tsUTCDate.textContent = utc.date;
+        if (dom.tsISTTime) dom.tsISTTime.textContent = ist.time;
+        if (dom.tsISTDate) dom.tsISTDate.textContent = ist.date;
+        if (dom.tsFhour)   dom.tsFhour.textContent   = `F+${first.properties.forecast_hour ?? '—'}h`;
+    } else {
+        if (dom.tsUTCTime) dom.tsUTCTime.textContent = '—';
+        if (dom.tsUTCDate) dom.tsUTCDate.textContent = '—';
+        if (dom.tsISTTime) dom.tsISTTime.textContent = '—';
+        if (dom.tsISTDate) dom.tsISTDate.textContent = '—';
+        if (dom.tsFhour)   dom.tsFhour.textContent   = 'F+—h';
+    }
+
     if (dom.slider) dom.slider.value = state.stepIndex;
 }
 
@@ -272,7 +338,6 @@ async function loadData() {
         state.timesteps   = buildIndex(state.allFeatures);
         state.dataLoaded  = true;
 
-        // Fix: set slider max AFTER data loads
         if (dom.slider) {
             dom.slider.max   = state.timesteps.length - 1;
             dom.slider.value = 0;
@@ -295,37 +360,22 @@ async function loadData() {
 
 /* ── EVENT HANDLERS ─────────────────────────── */
 
-// Play / Pause
-if (dom.btnPlay) {
-    dom.btnPlay.onclick = () => state.playing ? pause() : play();
-}
+if (dom.btnPlay)  dom.btnPlay.onclick  = () => state.playing ? pause() : play();
+if (dom.btnPrev)  dom.btnPrev.onclick  = () => { pause(); renderStep(state.stepIndex - 1); };
+if (dom.btnNext)  dom.btnNext.onclick  = () => { pause(); renderStep(state.stepIndex + 1); };
 
-// Step back
-if (dom.btnPrev) {
-    dom.btnPrev.onclick = () => { pause(); renderStep(state.stepIndex - 1); };
-}
-
-// Step forward
-if (dom.btnNext) {
-    dom.btnNext.onclick = () => { pause(); renderStep(state.stepIndex + 1); };
-}
-
-// Time slider
 if (dom.slider) {
     dom.slider.oninput = () => { pause(); renderStep(Number(dom.slider.value)); };
 }
 
-// Opacity — slider range 10–90, divide by 100 for 0.1–0.9
 if (dom.opacitySlider) {
     dom.opacitySlider.oninput = () => {
         state.opacity = Number(dom.opacitySlider.value) / 100;
-        // Clear rgba cache so colours are rebuilt with new alpha
         Object.keys(_rgbaCache).forEach(k => delete _rgbaCache[k]);
         drawFrame();
     };
 }
 
-// Loop toggle
 if (dom.btnLoop) {
     dom.btnLoop.onclick = () => {
         state.looping = !state.looping;
@@ -335,14 +385,11 @@ if (dom.btnLoop) {
 }
 
 /* ── MAP EVENTS ─────────────────────────────── */
-
-// Clear projection cache and canvas immediately on zoom/pan start
 map.on('zoomstart movestart', () => {
     clearProjectionCache();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 });
 
-// Redraw with fresh projections once movement ends
 map.on('zoomend moveend', () => {
     resizeCanvas();
     drawFrame();
