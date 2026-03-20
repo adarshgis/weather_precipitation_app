@@ -40,43 +40,36 @@
     <div class="legend-title">PRECIPITATION (mm / interval)</div>
 
     <div class="legend-items">
-
       <div class="legend-row">
         <span class="swatch vlight"></span>
         <span>0.5 – 3</span>
         <em>Very Light</em>
       </div>
-
       <div class="legend-row">
         <span class="swatch light"></span>
         <span>3 – 10</span>
         <em>Light</em>
       </div>
-
       <div class="legend-row">
         <span class="swatch mod"></span>
         <span>10 – 25</span>
         <em>Moderate</em>
       </div>
-
       <div class="legend-row">
         <span class="swatch heavy"></span>
         <span>25 – 60</span>
         <em>Heavy</em>
       </div>
-
       <div class="legend-row">
         <span class="swatch vheavy"></span>
         <span>60 – 120</span>
         <em>Very Heavy</em>
       </div>
-
       <div class="legend-row">
         <span class="swatch extreme"></span>
         <span>120+</span>
         <em>Extreme</em>
       </div>
-
     </div>
 
     <div class="legend-note">
@@ -87,25 +80,20 @@
   <!-- ════════════ TIMESTAMP DISPLAY ════════════ -->
   <div class="timestamp-display" id="timestampDisplay">
     <div class="ts-label">FORECAST TIME</div>
-    <div class="ts-utc" id="tsUTC">—</div>
-    <div class="ts-ist" id="tsIST">—</div>
+    <div class="ts-row">
+      <div class="ts-block">
+        <span class="ts-zone-label">UTC</span>
+        <span class="ts-time" id="tsUTCTime">—</span>
+        <span class="ts-date" id="tsUTCDate">—</span>
+      </div>
+      <div class="ts-divider"></div>
+      <div class="ts-block">
+        <span class="ts-zone-label ist">IST</span>
+        <span class="ts-time" id="tsISTTime">—</span>
+        <span class="ts-date" id="tsISTDate">—</span>
+      </div>
+    </div>
     <div class="ts-fhour" id="tsFhour">F+—h</div>
-  </div>
-
-  <!-- ════════════ STATS HUD ════════════ -->
-  <div class="stats-hud" id="statsHud">
-    <div class="stat-item">
-      <div class="stat-value" id="statFeatures">—</div>
-      <div class="stat-label">POLYGONS</div>
-    </div>
-    <div class="stat-item">
-      <div class="stat-value" id="statStep">—</div>
-      <div class="stat-label">STEP</div>
-    </div>
-    <div class="stat-item">
-      <div class="stat-value" id="statSteps">—</div>
-      <div class="stat-label">TOTAL</div>
-    </div>
   </div>
 
   <!-- ════════════ CONTROL BAR ════════════ -->
@@ -138,7 +126,7 @@
       <div class="load-spinner"></div>
       <div class="load-text" id="loadText">Initializing radar system…</div>
       <div class="load-sub">
-        Serve from <code>geojson/</code> using <code>python -m http.server 8000</code>
+        <code>Welcome, loading your forecast in few seconds</code>
       </div>
     </div>
   </div>
