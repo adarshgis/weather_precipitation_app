@@ -1,61 +1,152 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weather Forecast Map</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NOAA GFS · Precipitation Radar</title>
 
-    <!-- Leaflet CSS -->
-    <link 
-        rel="stylesheet" 
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
-        integrity="sha256-sA+vL6a0sLGyt3K2jZ6PTiM6tI1wq6m81rjTRK7r0kM=" 
-        crossorigin=""
-    />
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="https://adarshgis.github.io/weather_precipitation_app/style.css">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="style.css"/>
 </head>
+
 <body>
 
-<h2>Weather Forecast Map</h2>
+  <!-- ════════════ HEADER ════════════ -->
+  <header class="hud-header">
+    <div class="hud-logo">
+      <span class="logo-icon">◈</span>
+      <span class="logo-text">PRECIPRADAR</span>
+      <span class="logo-sub">GFS 0.25° · NOAA NOMADS</span>
+    </div>
+    <div class="hud-meta">
+      <div class="meta-pill" id="modelRun">MODEL RUN —</div>
+      <div class="meta-pill" id="dataStatus">LOADING…</div>
+    </div>
+  </header>
 
-<!-- Slider Container -->
-<div id="slider-container">
-    <input type="range" id="forecast-slider" min="0" max="23" step="1" value="0">
-    <span id="forecast-hour">Hour 5</span>
-</div>
+  <!-- ════════════ MAP ════════════ -->
+  <div id="map"></div>
 
-<!-- Map Container -->
-<div id="map"></div>
+  <!-- ════════════ LEGEND ════════════ -->
+  <div class="legend-panel">
+    <div class="legend-title">PRECIPITATION (mm / interval)</div>
 
-<!-- Leaflet JS -->
-<script 
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
-    integrity="sha256-o9N1j8mtGSpD34X9m7b3aHn7eXfXEi42wBgiMM+0vY8=" 
-    crossorigin="">
-</script>
+    <div class="legend-items">
 
-<!-- Custom Script -->
-<script src="https://adarshgis.github.io/weather_precipitation_app/script.js"></script>
+      <div class="legend-row">
+        <span class="swatch vlight"></span>
+        <span>0.5 – 3</span>
+        <em>Very Light</em>
+      </div>
 
-<script>
-// ---------------------------
-// Extra precaution: initialize slider label correctly
-document.addEventListener("DOMContentLoaded", function(){
-    const slider = document.getElementById("forecast-slider");
-    const forecastHourLabel = document.getElementById("forecast-hour");
+      <div class="legend-row">
+        <span class="swatch light"></span>
+        <span>3 – 10</span>
+        <em>Light</em>
+      </div>
 
-    // Update label based on slider value
-    slider.addEventListener("input", function(){
-        const hour = 5 + parseInt(this.value)*5; // f005, f010...
-        forecastHourLabel.innerText = "Hour " + hour;
-    });
+      <div class="legend-row">
+        <span class="swatch mod"></span>
+        <span>10 – 25</span>
+        <em>Moderate</em>
+      </div>
 
-    // Set initial label
-    forecastHourLabel.innerText = "Hour 5";
-});
-</script>
+      <div class="legend-row">
+        <span class="swatch heavy"></span>
+        <span>25 – 60</span>
+        <em>Heavy</em>
+      </div>
+
+      <div class="legend-row">
+        <span class="swatch vheavy"></span>
+        <span>60 – 120</span>
+        <em>Very Heavy</em>
+      </div>
+
+      <div class="legend-row">
+        <span class="swatch extreme"></span>
+        <span>120+</span>
+        <em>Extreme</em>
+      </div>
+
+    </div>
+
+    <div class="legend-note">
+      <small>Derived from GFS APCP difference (interval rainfall)</small>
+    </div>
+  </div>
+
+  <!-- ════════════ TIMESTAMP DISPLAY ════════════ -->
+  <div class="timestamp-display" id="timestampDisplay">
+    <div class="ts-label">FORECAST TIME</div>
+    <div class="ts-utc" id="tsUTC">—</div>
+    <div class="ts-ist" id="tsIST">—</div>
+    <div class="ts-fhour" id="tsFhour">F+—h</div>
+  </div>
+
+  <!-- ════════════ STATS HUD ════════════ -->
+  <div class="stats-hud" id="statsHud">
+    <div class="stat-item">
+      <div class="stat-value" id="statFeatures">—</div>
+      <div class="stat-label">POLYGONS</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="statStep">—</div>
+      <div class="stat-label">STEP</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="statSteps">—</div>
+      <div class="stat-label">TOTAL</div>
+    </div>
+  </div>
+
+  <!-- ════════════ CONTROL BAR ════════════ -->
+  <div class="control-bar">
+
+    <!-- Controls -->
+    <button class="ctrl-btn" id="btnPrev">◀◀</button>
+    <button class="ctrl-btn primary" id="btnPlayPause">▶</button>
+    <button class="ctrl-btn" id="btnNext">▶▶</button>
+
+    <!-- Slider -->
+    <div class="slider-wrap">
+      <input type="range" id="timeSlider" class="time-slider" min="0" value="0" step="1"/>
+    </div>
+
+    <!-- Loop -->
+    <button class="ctrl-btn toggle active" id="btnLoop" title="Loop on/off">⟳</button>
+
+    <!-- Opacity -->
+    <div class="opacity-group">
+      <span class="ctrl-label">α</span>
+      <input type="range" id="opacitySlider" class="opacity-slider" min="10" max="90" value="55" step="5"/>
+    </div>
+
+  </div>
+
+  <!-- ════════════ LOAD OVERLAY ════════════ -->
+  <div class="load-overlay" id="loadOverlay">
+    <div class="load-box">
+      <div class="load-spinner"></div>
+      <div class="load-text" id="loadText">Initializing radar system…</div>
+      <div class="load-sub">
+        Serve from <code>geojson/</code> using <code>python -m http.server 8000</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════ TOAST ════════════ -->
+  <div class="toast" id="toast"></div>
+
+  <script src="script.js"></script>
 
 </body>
 </html>
