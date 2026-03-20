@@ -1,75 +1,106 @@
+import os
 import subprocess
-from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from logging.handlers import RotatingFileHandler
+import logging
 
-# ---------------- PROJECT ROOT ----------------
-BASE_DIR = Path(__file__).resolve().parent.parent
+# -----------------------------
+# CONFIGURATION
+# -----------------------------
+INPUT_DIR = os.getenv("GFS_INPUT", "./data")
+OUTPUT_DIR = os.getenv("GFS_COG", "./cogs")
 
-# ---------------- INPUT & OUTPUT PATHS ----------------
-INPUT_DIR = BASE_DIR / "data" / "raw_grib"
-OUTPUT_DIR = BASE_DIR / "data" / "geotiff"
+# ✅ FIX: Use system GDAL (works in GitHub Actions)
+GDAL_PATH = os.getenv("GDAL_PATH", "gdal_translate")
 
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+MAX_WORKERS = 4
 
-# ---------------- CLEAN OLD FILES ----------------
-for file in OUTPUT_DIR.glob("*.tif"):
-    file.unlink()
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# ---------------- CHECK INPUT ----------------
-if not INPUT_DIR.exists():
-    raise FileNotFoundError(f"Input directory {INPUT_DIR} does not exist")
+# -----------------------------
+# LOGGING
+# -----------------------------
+logger = logging.getLogger("GFS_PIPELINE")
+logger.setLevel(logging.INFO)
 
-# ---------------- CONVERSION ----------------
-for file in sorted(INPUT_DIR.iterdir()):
+formatter = logging.Formatter(
+    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
-    if file.is_file():
+if not logger.handlers:
+    file_handler = RotatingFileHandler(
+        "pipeline_log.log",
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5
+    )
+    file_handler.setFormatter(formatter)
 
-        tif_file = OUTPUT_DIR / f"{file.name}.tif"
-        clean_tif = OUTPUT_DIR / f"{file.name}_clean.tif"
-        byte_tif = OUTPUT_DIR / f"{file.name}_byte.tif"
-        mercator_tif = OUTPUT_DIR / f"{file.name}_3857.tif"
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
 
-        print(f"Processing {file.name}")
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
 
-        # GRIB → GeoTIFF
-        subprocess.run([
-            "gdal_translate",
-            str(file),
-            str(tif_file)
-        ], check=True)
+# -----------------------------
+# PROCESS FUNCTION
+# -----------------------------
+def process_file(file):
+    try:
+        input_file = os.path.join(INPUT_DIR, file)
 
-        # Remove zero pixels (make transparent)
-        subprocess.run([
-            "gdal_calc.py",
-            "-A", str(tif_file),
-            "--outfile", str(clean_tif),
-            "--calc", "A*(A>0)",
-            "--NoDataValue", "0"
-        ], check=True)
+        if not (file.startswith("gfs.t") and "pgrb2" in file):
+            logger.info(f"Skipped (not valid GFS GRIB): {file}")
+            return
 
-        # Convert to 8-bit for gdal2tiles
-        subprocess.run([
-            "gdal_translate",
-            "-ot", "Byte",
-            "-scale", "0", "100", "0", "255",
-            "-a_nodata", "0",
-            str(clean_tif),
-            str(byte_tif)
-        ], check=True)
+        output_file = os.path.join(OUTPUT_DIR, file + ".tif")
 
-        # Reproject to Web Mercator (required for XYZ tiles)
-        subprocess.run([
-            "gdalwarp",
-            "-t_srs", "EPSG:3857",
-            "-r", "bilinear",
-            str(byte_tif),
-            str(mercator_tif)
-        ], check=True)
+        if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+            logger.info(f"Skipped (exists): {file}")
+            return
 
-        # remove intermediate files
-        tif_file.unlink()
-        clean_tif.unlink()
-        byte_tif.unlink()
+        cmd = [
+            GDAL_PATH,
+            input_file,
+            output_file,
+            "-of", "COG",
+            "-co", "COMPRESS=LZW"
+        ]
 
-        print(f"Created {mercator_tif.name}")
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
-print("All GRIB files converted successfully")
+        if result.returncode != 0:
+            raise Exception(result.stderr)
+
+        if not os.path.exists(output_file) or os.path.getsize(output_file) < 1000:
+            raise Exception("Invalid COG output")
+
+        logger.info(f"Processed: {file}")
+
+        try:
+            os.remove(input_file)
+            logger.info(f"Deleted source: {file}")
+        except Exception as e:
+            logger.warning(f"Could not delete {file}: {e}")
+
+    except Exception as e:
+        logger.error(f"Failed processing {file}: {e}")
+
+# -----------------------------
+# PARALLEL EXECUTION
+# -----------------------------
+def run_processing():
+    files = os.listdir(INPUT_DIR)
+
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = [executor.submit(process_file, f) for f in files]
+
+        for future in as_completed(futures):
+            future.result()
+
+# -----------------------------
+# MAIN
+# -----------------------------
+if __name__ == "__main__":
+    logger.info("COG conversion started")
+    run_processing()
+    logger.info("COG conversion completed")
