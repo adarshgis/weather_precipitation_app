@@ -1,26 +1,24 @@
 import requests
+from datetime import datetime, timedelta
+import os
 import logging
-from datetime import datetime
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from time import sleep
 
-# ---------------- CONFIG ---------------- #
-
+# -----------------------------
+# CONFIGURATION
+# -----------------------------
 BASE_URL = "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl"
+OUTPUT_DIR = os.getenv("GFS_OUTPUT", "./data")
 
-# Define project root relative to scripts folder
-BASE_DIR = Path(__file__).resolve().parent.parent
+MAX_WORKERS = 5
+RETRY_COUNT = 3
+TIMEOUT = 120
 
-# Standard folder for raw GRIB files
-OUTPUT_DIR = BASE_DIR / "data" / "raw_grib"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-FORECAST_HOURS = list(range(5,121,5))
 CYCLE = "00"
+DATE = (datetime.utcnow() - timedelta(days=1)).strftime("%Y%m%d")
 
-DATE = datetime.utcnow().strftime("%Y%m%d")
+FORECAST_HOURS = list(range(14, 90, 5))
 
 PARAMS = {
     "dir": f"/gfs.{DATE}/{CYCLE}/atmos",
@@ -28,73 +26,81 @@ PARAMS = {
     "lev_surface": "on"
 }
 
-MAX_THREADS = 6
-
-# ---------------- LOGGING ---------------- #
+# -----------------------------
+# LOGGING SETUP
+# -----------------------------
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 logging.basicConfig(
+    filename="pipeline_log.log",
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-# ---------------- SESSION WITH RETRIES ---------------- #
-
-session = requests.Session()
-
-retry = Retry(
-    total=5,
-    backoff_factor=2,
-    status_forcelist=[500,502,503,504]
-)
-
-adapter = HTTPAdapter(max_retries=retry)
-session.mount("http://", adapter)
-session.mount("https://", adapter)
-
-# ---------------- DOWNLOAD FUNCTION ---------------- #
-
+# -----------------------------
+# DOWNLOAD FUNCTION
+# -----------------------------
 def download_file(forecast_hour):
-
     fhr = f"{forecast_hour:03d}"
     filename = f"gfs.t{CYCLE}z.pgrb2.0p25.f{fhr}"
-    filepath = OUTPUT_DIR / filename
+    filepath = os.path.join(OUTPUT_DIR, filename)
 
-    if filepath.exists():
-        logging.info(f"{filename} already exists, skipping")
-        return
+    # Skip if already exists
+    if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+        logging.info(f"Skipped (exists): {filename}")
+        return f"Skipped {filename}"
 
-    p = PARAMS.copy()
-    p["file"] = filename
+    params = PARAMS.copy()
+    params["file"] = filename
 
-    try:
+    for attempt in range(RETRY_COUNT):
+        try:
+            response = requests.get(BASE_URL, params=params, stream=True, timeout=TIMEOUT)
 
-        logging.info(f"Downloading {filename}")
+            if response.status_code == 200:
+                with open(filepath, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=1024 * 1024):
+                        if chunk:
+                            f.write(chunk)
 
-        r = session.get(BASE_URL, params=p, stream=True, timeout=120)
+                # Validate file size
+                if os.path.getsize(filepath) < 1000:
+                    raise Exception("File too small, possible corruption")
 
-        if r.status_code != 200:
-            logging.error(f"Failed {filename} - HTTP {r.status_code}")
-            return
+                logging.info(f"Downloaded: {filename}")
+                return f"Downloaded {filename}"
 
-        with open(filepath, "wb") as f:
-            for chunk in r.iter_content(chunk_size=1024*1024):
-                if chunk:
-                    f.write(chunk)
+            else:
+                raise Exception(f"HTTP {response.status_code}")
 
-        logging.info(f"Downloaded {filename}")
+        except Exception as e:
+            logging.warning(f"Retry {attempt+1} failed for {filename}: {e}")
+            sleep(2)
 
-    except Exception as e:
-        logging.error(f"Error downloading {filename}: {e}")
+    logging.error(f"Failed: {filename}")
+    return f"Failed {filename}"
 
-# ---------------- MAIN ---------------- #
+# -----------------------------
+# PARALLEL EXECUTION
+# -----------------------------
+def run_downloads():
+    results = []
 
-def main():
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = [executor.submit(download_file, fh) for fh in FORECAST_HOURS]
 
-    with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-        executor.map(download_file, FORECAST_HOURS)
+        for future in as_completed(futures):
+            result = future.result()
+            print(result)
+            results.append(result)
 
-    logging.info("All downloads complete")
+    return results
 
-
+# -----------------------------
+# MAIN
+# -----------------------------
 if __name__ == "__main__":
-    main()
+    logging.info("Download started")
+    run_downloads()
+    logging.info("Download completed")
+    print("All downloads completed")
