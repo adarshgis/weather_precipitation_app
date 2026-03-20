@@ -74,8 +74,8 @@ weather_precipitation_app/
 ├── style.css                              # Dark HUD UI styles
 │
 ├── pipeline/                              # Python data processing scripts
-│   ├── download_gfs.py                    # Downloads GRIB2 from NOAA NOMADS
-│   ├── process_grib.py                    # Converts GRIB2 → GeoJSON
+│   ├── 01_downloading_data.py             # Downloads GRIB2 from NOAA NOMADS
+│   ├── 02_convert_to_cog.py               # Converts GRIB2 → GeoJSON
 │   └── ...
 │
 └── .github/
@@ -103,8 +103,8 @@ pip install cfgrib xarray rasterio geopandas shapely
 
 Run the pipeline:
 ```bash
-python pipeline/download_gfs.py
-python pipeline/process_grib.py
+python pipeline/01_downloading_data.py
+python pipeline/02_convert_to_cog.py
 ```
 
 This will update `geojson/precipitation_timeseries.geojson` with the latest GFS forecast.
