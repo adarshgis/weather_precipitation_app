@@ -30,8 +30,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gdal-bin libgdal-dev
 
-      # ---------------- TILE TOOLS INSTALL (NEW) ----------------
-      - name: Install Tippecanoe + PMTiles tools
+      # ---------------- TIPPECANOE INSTALL ----------------
+      - name: Install Tippecanoe
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libsqlite3-dev zlib1g-dev
@@ -53,21 +53,30 @@ jobs:
           mkdir -p data/raw_grib
           mkdir -p cogs
           mkdir -p geojson
-          mkdir -p pmtiles   # NEW
+          mkdir -p pmtiles
 
       # ---------------- RUN PIPELINE ----------------
-      - name: Run weather pipeline
+      - name: Run weather pipeline (GeoJSON generation)
         run: python scripts/04_run_pipeline.py
 
-      # ---------------- BUILD PMTILES (NEW) ----------------
+      # ---------------- CLEAN OLD PMTILES ----------------
+      - name: Clean old PMTiles
+        run: |
+          rm -f pmtiles/weather.pmtiles
+
+      # ---------------- BUILD PMTILES ----------------
       - name: Convert GeoJSON to PMTiles
         run: |
-          if [ -d "geojson" ]; then
+          if ls geojson/*.geojson 1> /dev/null 2>&1; then
             tippecanoe \
               -o pmtiles/weather.pmtiles \
               -zg \
+              --force \
               --drop-densest-as-needed \
               geojson/*.geojson
+          else
+            echo "No GeoJSON files found!"
+            exit 1
           fi
 
       # ---------------- COMMIT OUTPUT ----------------
@@ -76,18 +85,13 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
 
-          # Add GeoJSON
-          if [ -d "geojson" ]; then
-            git add geojson/
-          fi
-
-          # Add PMTiles
-          if [ -d "pmtiles" ]; then
-            git add pmtiles/
-          fi
+          # Add outputs
+          git add geojson/
+          git add pmtiles/
 
           # Commit only if changes exist
           git diff --cached --quiet || git commit -m "Update GeoJSON + PMTiles (auto)"
 
+          # Sync with remote before push
           git pull --rebase
           git push
