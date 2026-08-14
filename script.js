@@ -155,7 +155,7 @@ fetch(CFG.boundaryPath)
             pane: 'indiaBoundaryPane',
             style: {
                 fill:        false,   // transparent interior
-                color:       '#ffffff',
+                color:       '#000000',
                 weight:      1.5,
                 opacity:     0.9,
                 lineJoin:    'round'
