@@ -242,7 +242,7 @@ html, body {
 
 .ts-zone-label {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 15px;
   letter-spacing: 0.2em;
   color: var(--text-dim);
   text-transform: uppercase;
