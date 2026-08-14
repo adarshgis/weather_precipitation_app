@@ -7,6 +7,7 @@
 /* ── CONFIG ──────────────────────────────────── */
 const CFG = {
     geojsonPath: 'geojson/precipitation_timeseries.geojson',
+    boundaryPath: 'geojson/india_boundary.geojson',
     mapCenter:   [20, 78],
     mapZoom:     4,
     defaultInterval: 1200,
@@ -136,6 +137,32 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
+
+/* ── INDIA BOUNDARY (outline only, above basemap) ──────────
+   Dedicated pane so it always sits above the tile layer
+   (z 200) but below the precipitation canvas (z 450). */
+map.createPane('indiaBoundaryPane');
+map.getPane('indiaBoundaryPane').style.zIndex = 420;
+map.getPane('indiaBoundaryPane').style.pointerEvents = 'none';
+
+fetch(CFG.boundaryPath)
+    .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    })
+    .then(geo => {
+        L.geoJSON(geo, {
+            pane: 'indiaBoundaryPane',
+            style: {
+                fill:        false,   // transparent interior
+                color:       '#ffffff',
+                weight:      1.5,
+                opacity:     0.9,
+                lineJoin:    'round'
+            }
+        }).addTo(map);
+    })
+    .catch(e => console.error('India boundary load failed:', e));
 
 /* ── CANVAS ─────────────────────────────────── */
 const mapPane = map.getPane('mapPane');
