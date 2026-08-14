@@ -130,7 +130,8 @@ function parseTimestamps(utcStr, istStr) {
 /* ── MAP ─────────────────────────────────────── */
 const map = L.map('map', {
     center: CFG.mapCenter,
-    zoom:   CFG.mapZoom
+    zoom:   CFG.mapZoom,
+   zoomControl: false
 });
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
