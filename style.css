@@ -257,7 +257,7 @@ html, body {
 /* Time value — both UTC and IST equally prominent */
 .ts-time {
   font-family: var(--font-mono);
-  font-size: 20px;
+  font-size: 22px;
   color: var(--accent2);
   text-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
   letter-spacing: 0.05em;
@@ -267,7 +267,7 @@ html, body {
 /* Date value — same weight for both */
 .ts-date {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 20px;
   color: var(--text);
   letter-spacing: 0.04em;
 }
